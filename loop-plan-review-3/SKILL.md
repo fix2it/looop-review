@@ -1,6 +1,6 @@
 ---
 name: loop-plan-review-3
-description: Interactive iterative review for plan and specification documents using fresh independent reviewer agents without the orchestrator's conversation history. Before reading the plan or repository, present blocker, critical, serious, medium, minor, and preference-level plan-defect options, explain each briefly, ask which levels to search, and wait for an explicit answer. Then verify, revise, score, and loop only within the selected severity scope until the plan is execution-ready at that scope. Use when the user invokes `/loop-plan-review-3` or `$loop-plan-review-3`, asks for plan review v3 with selectable depth, or wants to choose how strict an iterative plan review should be. Track every round in a user-language score table and the Codex status-line state file.
+description: Interactive iterative review for plan and specification documents using fresh independent reviewer agents without the orchestrator's conversation history. Before reading the plan or repository, present blocker, critical, serious, medium, minor, and preference-level plan-defect options, explain each briefly, ask which levels to search, and wait for an explicit answer. Then verify, revise, score, and loop only within the selected severity scope until reviewer acceptance or the main orchestrator's mandatory development-ready stop. Use when the user invokes `/loop-plan-review-3` or `$loop-plan-review-3`, asks for plan review v3 with selectable depth, or wants to choose how strict an iterative plan review should be. Track every round in a user-language score table and the Codex status-line state file.
 ---
 
 # Loop Plan Review 3
@@ -61,6 +61,22 @@ A plan states intent, boundaries, ordering, acceptance, risk, and fallback. It i
 - When a claim depends on runtime behavior such as performance, query plans, code generation, or lock duration, encode it as: named hypothesis, earliest-stage experiment, acceptance threshold, and fallback.
 - Do not run experiments during plan review. If the plan already records hypothesis, experiment, threshold, and fallback, the unknown runtime answer is not a finding.
 - Treat unnecessary code-level detail as a finding only when its actual impact falls within the selected severity scope.
+
+## Mandatory Orchestrator Development-Ready Stop
+
+Treat plan review as a gate to safe implementation, not a demand for a perfect document. The main orchestrator that owns the upcoming implementation must stop the loop as soon as the plan is ready to build.
+
+- After processing and validating every scoring pass, explicitly decide whether implementation can safely begin now.
+- Require a successful stop even below 9.5/10 or with remaining reviewer comments as soon as the orchestrator determines all of the following:
+  - goal, scope, ordering, ownership, repository anchors, and acceptance criteria are sufficient to start without dangerous guessing;
+  - no blocker, critical safety risk, or unresolved security, privacy, payment, data-loss, or irreversible-rollout issue remains;
+  - no unanswered product decision or material repository contradiction is likely to cause wrong behavior or major rework;
+  - every remaining comment is implementation-local, can be settled by an early experiment already bounded by threshold and fallback, or can be safely found and fixed during implementation and `loop-code-review-3`.
+- Never defer a known plan-level defect to code review when it could select the wrong product behavior, break a contract or migration, expose data, make rollback unsafe, or force major architectural rework.
+- This decision is a hard stop, not an optional override. Once the gate passes, do not continue reviewing, polishing, or ask the user whether to run another pass unless the user explicitly requests more review after seeing the final result.
+- When this gate passes, state in the user's language: "The plan is ready for development; remaining acceptable issues will be handled during implementation and code review." List only concrete remaining risks worth carrying forward.
+- Label this result as **accepted by the main orchestrator as development-ready**, not as reviewer acceptance or a 9.5 score.
+- Do not launch another scoring pass merely to raise the score or polish the plan after this gate passes.
 
 ## Plan Scope
 
@@ -139,6 +155,7 @@ Do not chase score-only polish.
    - Clarification from the same reviewer is not a new scoring pass, and its original score cannot be reused after an actionable finding.
    - If the reviewer scores below 9.5 with no in-scope actionable findings, ask once for the concrete in-scope blocker. Accept an explicit no-in-scope-findings signal when none is supplied.
    - If output remains malformed or shows no credible understanding, use a fresh reviewer.
+   - Apply **Mandatory Orchestrator Development-Ready Stop** after verified revisions. If it passes, end the loop immediately; otherwise continue only when another pass could prevent a material implementation risk rather than pursue plan perfection.
 
 6. Report the completed round:
    - Add it to the running table using **Score Trajectory Report**.
@@ -152,7 +169,7 @@ Do not chase score-only polish.
 
 8. Repeat:
    - Use a fresh reviewer after revisions, evidence-based rejection, or malformed output. Never reuse a score after an actionable finding.
-   - Accept only when selected-scope validation passes, no unresolved in-scope findings or product decisions remain, and the latest reviewer either scores at least 9.5/10 or explicitly reports no in-scope actionable findings.
+   - Accept through either of two explicit paths: reviewer acceptance (selected-scope validation passes, no unresolved in-scope findings or product decisions remain, and the latest reviewer scores at least 9.5/10 or reports no in-scope actionable findings) or the **Mandatory Orchestrator Development-Ready Stop**. The first path reached ends the loop immediately.
    - Use at most five scoring passes unless the user requests another limit or persistence until acceptance.
    - Treat two unchanged passes repeating rejected, stale, or out-of-scope comments as stagnation.
    - Treat pass-limit exhaustion or stagnation without acceptance as incomplete, not success.
@@ -164,7 +181,7 @@ Do not chase score-only polish.
 - **9.5:** No selected-level actionable findings remain; only unselected or subjective ideas may exist; grounding and validation are sufficient.
 - **Below 9.5:** At least one meaningful selected-level finding, unanswered in-scope product decision, or required validation gap remains.
 
-The score summarizes only chosen levels. It never overrides concrete in-scope findings, contradictions, or unverified claims.
+The score summarizes only chosen levels. It never overrides concrete in-scope findings, contradictions, or unverified claims. A score below 9.5 does not by itself require another pass when the main orchestrator has explicitly accepted the plan as development-ready under the gate above.
 
 ## Score Trajectory Report
 
@@ -223,6 +240,7 @@ End with a scoped score from 1 to 10: 10 when no selected-level defect remains a
 - Print the final trajectory table with selected scope and exact reviewer model per round.
 - State which plan-defect levels were reviewed and explicitly state that unselected levels were not assessed.
 - Report plan revisions and why, scoped acceptance signal, pass count, and whether the loop passed, stopped incomplete, or was interrupted.
+- State whether acceptance came from the reviewer or from the main orchestrator's development-ready decision. For the latter, state that implementation may begin and name any concrete risks intentionally handed to implementation and code review.
 - Confirm reasoning-effort parity for every counted round.
 - Report repository claims verified, user product decisions, intentionally unchanged in-scope findings, safety overrides, altitude stops, and remaining risks.
 - Remove the status-line state file after printing the final table.

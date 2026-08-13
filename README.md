@@ -39,6 +39,8 @@ Reviews a plan or specification for execution readiness at the selected severity
 
 It keeps plans at the right altitude: runtime uncertainty becomes a hypothesis, early experiment, threshold, and fallback—not speculative implementation detail.
 
+The main orchestrator must end the loop once the plan is safe to implement, even below 9.5. This hard stop activates only when no blocker, catastrophic risk, major product decision, or plan defect likely to cause major rework remains; acceptable implementation-local questions move to development and code review.
+
 ## Shared behavior
 
 - Mandatory severity selection before reading or reviewing.
@@ -46,6 +48,7 @@ It keeps plans at the right altitude: runtime uncertainty becomes a hypothesis, 
 - Reviewer reasoning effort exactly matches the orchestrator's effort.
 - Exact runtime reviewer model is shown in every score row.
 - Scoped scores: `9.5/10` applies only to the selected severity levels.
+- Plan review stops immediately when the main orchestrator accepts the plan as development-ready; the reviewer score remains visible and is not inflated.
 - At most five scoring passes by default; exhaustion is incomplete, not success.
 - Score trajectory is shown in the user's language and mirrored to the Codex status line.
 - Unmistakable catastrophic safety risks may be surfaced once even when outside the chosen scope.
