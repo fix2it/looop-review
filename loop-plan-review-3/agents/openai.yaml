@@ -1,0 +1,4 @@
+interface:
+  display_name: "Loop Plan Review 3"
+  short_description: "Choose plan-review severity before each loop"
+  default_prompt: "Use $loop-plan-review-3 to ask which severity levels to review, then improve the plan only within that scope."
