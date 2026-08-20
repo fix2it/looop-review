@@ -1,13 +1,25 @@
 ---
 name: loop-plan-review-3
-description: Interactive iterative review for plan and specification documents using fresh independent reviewer agents without the orchestrator's conversation history. Before reading the plan or repository, present blocker, critical, serious, medium, minor, and preference-level plan-defect options, explain each briefly, ask which levels to search, and wait for an explicit answer. Then verify, revise, score, and loop only within the selected severity scope until reviewer acceptance or the main orchestrator's mandatory development-ready stop. Use when the user invokes `/loop-plan-review-3` or `$loop-plan-review-3`, asks for plan review v3 with selectable depth, or wants to choose how strict an iterative plan review should be. Track every round in a user-language score table and the Codex status-line state file.
+description: Interactive iterative review for plan and specification documents using fresh independent reviewer agents without the orchestrator's conversation history. Before reading the plan or repository, present blocker, critical, serious, medium, minor, and preference-level plan-defect options, explain each briefly, ask which levels to search, and wait for an explicit answer. Then verify, revise, score, and loop only within the selected severity scope until reviewer acceptance or the main orchestrator's mandatory development-ready stop. Use when the user invokes `/loop-plan-review-3` or `$loop-plan-review-3`, asks for plan review v3 with selectable depth, or wants to choose how strict an iterative plan review should be. The reviewer must run on exactly the same model and reasoning effort as the main orchestrator; never delegate the review to another model, assistant, agent, or external tool. Track every round in a user-language score table and the status-line state file.
 ---
 
 # Loop Plan Review 3
 
+## Hard Rule: The Reviewer Runs On The Orchestrator's Own Model
+
+**The reviewer MUST run on exactly the same model and exactly the same reasoning effort as the main orchestrator running this skill.**
+
+**Each scoring pass runs exactly one reviewer.** Never two or more in parallel, and never on different models to compare or combine results.
+
+These are hard requirements, not defaults, preferences, or starting suggestions. This skill never selects, proposes, or falls back to any other model. It never routes the review to another assistant, coding agent, CLI, or review service, no matter what is installed or available in the environment.
+
+If the orchestrator's own model or reasoning effort cannot be established, the loop stops and reports as incomplete. It never proceeds on a substitute.
+
+Full requirements are in **Reviewer Runtime Parity** and **Reviewer Independence**.
+
 ## Overview
 
-Run an interactive review-and-improve loop over a plan document. First require the user to choose which severity levels count. Then use fresh independent read-only reviewers, revise only in-scope plan defects, verify claims against repository evidence, and continue until the scoped acceptance criteria are met.
+Run an interactive review-and-improve loop over a plan document. First require the user to choose which severity levels count. Then use fresh independent read-only reviewers running on the orchestrator's own model and effort, revise only in-scope plan defects, verify claims against repository evidence, and continue until the scoped acceptance criteria are met.
 
 Execution-ready means that an implementer with repository access but no conversation history can follow the plan without guessing about goals, ordering, ownership, file-level targets, acceptance criteria, risks, validation, or fallback behavior.
 
@@ -88,8 +100,17 @@ Treat plan review as a gate to safe implementation, not a demand for a perfect d
 
 ## Reviewer Independence
 
-Independent review means the reviewer may share filesystem and repository state but must not inherit parent conversation history, reasoning, assumptions, tool results, or prior review discussion.
+Independent review means the reviewer runs on the orchestrator's own model and effort and may share filesystem and repository state, but must not inherit parent conversation history, reasoning, assumptions, tool results, or prior review discussion.
 
+Independence comes from a fresh context only. A different model, assistant, or tool is not a source of independence and must never be used to obtain it.
+
+**Exactly one reviewer per scoring pass.** A scoring pass launches a single reviewer agent, waits for its complete output, and produces exactly one score.
+
+- Never run two or more reviewers at the same time, in parallel, or as a fan-out, ensemble, panel, tie-breaker, second opinion, or cross-check.
+- Never launch reviewers on different models to compare, combine, average, reconcile, or vote on their findings and scores.
+- Never launch an extra reviewer because the first one is slow, cheap to duplicate, or might miss something, or because the environment makes parallel agents easy.
+- One round has exactly one reviewer, one model, and one score. If a round would produce more than one score, the design is wrong; stop and run a single reviewer instead.
+- Additional reviewers are sequential only: a fresh reviewer starts after the previous round is fully processed, and only for the reasons listed in the workflow.
 - Start every scoring reviewer as a fresh agent in an isolated conversation context.
 - Pass a self-contained prompt with repository location, plan path, grounding-source paths, selected severity levels and definitions, and validation expectations.
 - Require the reviewer to read the plan and independently inspect repository evidence before scoring.
@@ -97,17 +118,30 @@ Independent review means the reviewer may share filesystem and repository state 
 
 ## Reviewer Runtime Parity
 
-Match the reviewer agent's reasoning effort exactly to the orchestrator revising the plan.
+The reviewer agent MUST run on exactly the same model and at exactly the same reasoning effort as the orchestrator revising the plan. Both are mandatory. Neither may be traded for the other.
 
-- Resolve the orchestrator's actual reasoning effort and the exact reviewer model before every scoring pass.
-- Launch `low` with `low`, `medium` with `medium`, `high` with `high`, `xhigh` with `xhigh`, `max` with `max`, and any other supported level with the identical level.
-- Never promote the reviewer merely because it is reviewing and never lower effort to save cost.
-- Use guaranteed native inheritance when it preserves exact effort while keeping context isolated; otherwise pass effort explicitly.
-- Do not use a reviewer preset or role whose fixed effort differs from the orchestrator's effort.
+Required before every scoring pass:
+
+- Resolve the orchestrator's own running model and its actual reasoning-effort setting first, then launch the reviewer with both identical.
+- Match the model exactly: same model, same version or variant identifier. Not a sibling model, not a smaller or larger one from the same family, not a "reviewer" or "reasoning" variant.
+- Match reasoning effort exactly: `low` with `low`, `medium` with `medium`, `high` with `high`, `xhigh` with `xhigh`, `max` with `max`, and any other supported level with the identical level.
+- Use guaranteed native inheritance when it preserves the orchestrator's exact model and effort while keeping context isolated; otherwise pass both explicitly at launch.
 - Record the exact runtime model name from launch configuration or runtime metadata. Never infer, translate, shorten, or guess it.
-- If model identity cannot be determined, select it explicitly. If reasoning parity cannot be established, do not count the pass; report the loop as incomplete.
 
-Reviewer and orchestrator models may differ. Reasoning-effort parity is mandatory; model identity is not. Always report the model that actually reviewed the plan.
+Prohibited without exception:
+
+- Selecting, proposing, or defaulting to any model other than the orchestrator's own, for any reason.
+- Routing the review to a separate assistant, coding agent, CLI, subscription, API, or external review service, even when one is installed, configured, available, cheaper, faster, idle, or appears better suited to reviewing.
+- Treating a different model or tool as a way to achieve reviewer independence. Independence comes only from a fresh, isolated context.
+- Promoting the reviewer because it is reviewing, or downgrading its model or effort to save cost, tokens, quota, or time.
+- Using a reviewer preset, role, agent type, or configuration whose model or fixed effort differs from the orchestrator's current model and effort.
+- Substituting a stand-in when the orchestrator's model or effort cannot be determined.
+
+If exact model parity or exact effort parity cannot be established, do not launch the reviewer and do not count a pass. Stop and report the loop as incomplete, naming which parity could not be established.
+
+The only permitted deviation is an explicit, unambiguous instruction from the user to run the reviewer on a specific different model. Never infer this from context, environment, or convenience. When it happens, state the deviation in the round table and in the Final Response.
+
+Always report the model that actually reviewed the plan.
 
 ## Review Dimensions
 
@@ -140,8 +174,9 @@ Do not chase score-only polish.
    - If an out-of-scope problem prevents meaningful review, stop and ask whether to expand scope; do not silently revise it.
    - Record the evidence checked so the reviewer can verify it independently.
 
-4. Start one independent reviewer:
-   - Start a fresh isolated conversation and apply **Reviewer Runtime Parity**.
+4. Start exactly one independent reviewer, never two or more at once:
+   - Apply **Reviewer Runtime Parity** before launching: confirm the orchestrator's own model and reasoning effort, and launch the reviewer on both identically. If either cannot be confirmed, stop here and report the loop as incomplete instead of launching.
+   - Start a fresh isolated conversation on that same model and effort.
    - Include plan path, grounding sources, exact selected levels and definitions, **Severity Scope Contract**, and **Plan Altitude** in the prompt.
    - Require read-only independent inspection, findings with plan-section and repository references, an execution-readiness summary, and a final scoped score from 1 to 10.
 
@@ -197,16 +232,16 @@ The score summarizes only chosen levels. It never overrides concrete in-scope fi
 - Translate findings for a non-programmer and keep each cell to one short line.
 - When a score dips, explain that a real in-scope defect surfaced which earlier rounds missed.
 
-Example in Russian; render in the user's language and use actual model names and selected scope:
+Example in Russian; render it in the user's language with the selected scope and the real runtime model name. `<модель>` below is a placeholder for the model that actually ran — never print a placeholder or copy an example value into a real table.
 
 | Раунд | Что искали | Модель | Оценка | Самая серьёзная находка | Почему продолжаем или стоп |
 |-------|-------------|--------|--------|--------------------------|-----------------------------|
-| 1 | Блокеры, критические, серьёзные | gpt-5.6-sol | 8,0 | Серьёзная | В плане пропустили обязательную миграцию — добавили |
-| 2 | Блокеры, критические, серьёзные | gpt-5.6-sol | 9,5 | Нет | В выбранных уровнях замечаний не осталось |
+| 1 | Блокеры, критические, серьёзные | `<модель>` | 8,0 | Серьёзная | В плане пропустили обязательную миграцию — добавили |
+| 2 | Блокеры, критические, серьёзные | `<модель>` | 9,5 | Нет | В выбранных уровнях замечаний не осталось |
 
 ## Status-line Round Feed
 
-Mirror scores into a small state file for the live Codex status line. Refresh it whenever the table is printed and clear it when the loop finishes. Failure here must never block or alter review.
+Mirror scores into a small state file for a live status line. Refresh it whenever the table is printed and clear it when the loop finishes. Failure here must never block or alter review.
 
 - Key the file by repository root, falling back to `$PWD` outside Git:
   `RF="$HOME/.Codex/statusline-state/loop-review/$(printf '%s' "$(git rev-parse --show-toplevel 2>/dev/null || printf '%s' "$PWD")" | sed 's#[^A-Za-z0-9]#_#g')"`
@@ -241,6 +276,6 @@ End with a scoped score from 1 to 10: 10 when no selected-level defect remains a
 - State which plan-defect levels were reviewed and explicitly state that unselected levels were not assessed.
 - Report plan revisions and why, scoped acceptance signal, pass count, and whether the loop passed, stopped incomplete, or was interrupted.
 - State whether acceptance came from the reviewer or from the main orchestrator's development-ready decision. For the latter, state that implementation may begin and name any concrete risks intentionally handed to implementation and code review.
-- Confirm reasoning-effort parity for every counted round.
+- Confirm model and reasoning-effort parity for every counted round.
 - Report repository claims verified, user product decisions, intentionally unchanged in-scope findings, safety overrides, altitude stops, and remaining risks.
 - Remove the status-line state file after printing the final table.

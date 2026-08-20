@@ -13,7 +13,7 @@ The derivative work adds, among other changes:
 - mandatory user-selected severity scope;
 - domain-specific severity definitions for code and plan review;
 - strict scoped scoring and acceptance behavior;
-- reviewer reasoning-effort parity with the orchestrator;
+- reviewer model and reasoning-effort parity with the orchestrator;
 - exact runtime model reporting;
-- score trajectory and Codex status-line integration;
+- score trajectory and status-line integration;
 - a plan-review workflow with repository grounding and plan-altitude rules.

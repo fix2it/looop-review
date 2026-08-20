@@ -44,13 +44,13 @@ The main orchestrator must end the loop once the plan is safe to implement, even
 ## Shared behavior
 
 - Mandatory severity selection before reading or reviewing.
-- Fresh independent reviewer context for every scoring pass.
-- Reviewer reasoning effort exactly matches the orchestrator's effort.
+- Fresh independent reviewer context for every scoring pass, with exactly one reviewer per pass — never two in parallel, never an ensemble across models.
+- **Hard rule:** the reviewer runs on exactly the same model and at exactly the same reasoning effort as the main orchestrator. The skill never picks another model and never delegates the review to a different assistant, agent, CLI, or external service. If parity cannot be established, the loop stops as incomplete instead of substituting.
 - Exact runtime reviewer model is shown in every score row.
 - Scoped scores: `9.5/10` applies only to the selected severity levels.
 - Plan review stops immediately when the main orchestrator accepts the plan as development-ready; the reviewer score remains visible and is not inflated.
 - At most five scoring passes by default; exhaustion is incomplete, not success.
-- Score trajectory is shown in the user's language and mirrored to the Codex status line.
+- Score trajectory is shown in the user's language and mirrored to a live status line.
 - Unmistakable catastrophic safety risks may be surfaced once even when outside the chosen scope.
 
 ## Install
@@ -62,36 +62,23 @@ git clone https://github.com/tablesguru/looop-review.git
 cd looop-review
 ```
 
-For Codex:
+Copy both skill folders into the user-level skills directory your agent runtime reads:
 
 ```sh
-mkdir -p ~/.agents/skills
-cp -R loop-code-review-3 loop-plan-review-3 ~/.agents/skills/
-```
-
-For Claude Code:
-
-```sh
-mkdir -p ~/.claude/skills
-cp -R loop-code-review-3 loop-plan-review-3 ~/.claude/skills/
+SKILLS_DIR="$HOME/.agents/skills"   # replace with the skills path your runtime expects
+mkdir -p "$SKILLS_DIR"
+cp -R loop-code-review-3 loop-plan-review-3 "$SKILLS_DIR"/
 ```
 
 You can also install either folder at project scope using the skill directory supported by your agent runtime.
 
 ## Use
 
-In Codex:
+Invoke either skill by name, using whatever invocation prefix your agent runtime uses for skills — commonly `/` or `$`:
 
 ```text
-$loop-code-review-3
-$loop-plan-review-3 path/to/plan.md
-```
-
-In Claude Code:
-
-```text
-/loop-code-review-3
-/loop-plan-review-3 path/to/plan.md
+loop-code-review-3
+loop-plan-review-3 path/to/plan.md
 ```
 
 The skill first asks which severity levels to search and waits for an explicit answer.
@@ -101,11 +88,9 @@ The skill first asks which severity levels to search and waits for an explicit a
 ```text
 looop-review/
 ├── loop-code-review-3/
-│   ├── SKILL.md
-│   └── agents/openai.yaml
+│   └── SKILL.md
 ├── loop-plan-review-3/
-│   ├── SKILL.md
-│   └── agents/openai.yaml
+│   └── SKILL.md
 ├── LICENSE
 └── NOTICE.md
 ```
