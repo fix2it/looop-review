@@ -21,9 +21,13 @@ Full requirements are in **Reviewer Runtime Parity** and **Reviewer Independence
 
 Run an interactive review-and-fix loop over the current task's active git changes without reviewing unrelated worktree changes. First require the user to choose which severity levels count. Then use fresh independent read-only reviewer agents running on the orchestrator's own model and effort, address only in-scope findings, validate the result, and continue until the scoped acceptance criteria are met.
 
+## Fast-Path Invocation
+
+If the user explicitly specifies the severity levels in the triggering command (for example `/lcr 1-3`, `/loop-code-review-3 1-3`, or `lcr 1-4`), normalize the selection, confirm the chosen scope in a single concise sentence, and proceed directly to Step 2 (inspect worktree) without asking. If severity is missing or ambiguous, ask the question below.
+
 ## Mandatory Severity Selection
 
-Before inspecting the repository, running validation, reading diffs, or spawning a reviewer, ask the user which severity levels to search. This question is mandatory on every invocation, even if the invocation appears to imply a choice. Ask it in the user's language, make it the only substantive response, end the turn, and wait for an explicit answer.
+Before inspecting the repository, running validation, reading diffs, or spawning a reviewer, ask the user which severity levels to search (unless already provided via Fast-Path). This question is mandatory when severity is unspecified. Ask it in the user's language, make it the only substantive response, end the turn, and wait for an explicit answer.
 
 Present all of these options with short plain-language descriptions:
 
@@ -107,7 +111,9 @@ Prohibited without exception:
 - Using a reviewer role, preset, agent type, or configuration whose model or fixed reasoning effort differs from the orchestrator's current model and effort.
 - Substituting a stand-in when the orchestrator's model or effort cannot be determined.
 
-If exact model parity or exact effort parity cannot be established, do not launch the reviewer and do not count a pass. Stop and report the loop as incomplete, naming which parity could not be established.
+When running on platforms with native subagent inheritance (such as `model: inherit` in Antigravity/Gemini or standard subagent tool calls where the host platform automatically preserves the orchestrator's model and reasoning settings), runtime parity is satisfied automatically and does not require explicit textual confirmation of internal reasoning-effort parameters.
+
+If exact model parity or exact effort parity cannot be established (and native inheritance is not available), do not launch the reviewer and do not count a pass. Stop and report the loop as incomplete, naming which parity could not be established.
 
 The only permitted deviation is an explicit, unambiguous instruction from the user to run the reviewer on a specific different model. Never infer this from context, environment, or convenience. When it happens, state the deviation in the round table and in the Final Response.
 
@@ -137,19 +143,19 @@ Do not chase score-only polish.
 
 ## Workflow
 
-1. Complete **Mandatory Severity Selection** and wait for the user's answer.
+1. Determine scope: use **Fast-Path Invocation** if severity was provided in the triggering command; otherwise complete **Mandatory Severity Selection** and wait for the user's answer.
 
 2. Inspect the worktree:
    - Run `git status --short`, `git diff`, and `git diff --cached`.
+   - If the working tree is completely clean and there are no active changes or task-scoped modifications to review, state in the user's language: "No active git changes found to review. Working tree is clean." and exit immediately without spawning reviewers.
    - Include relevant untracked files only when they belong to the current task.
    - Separate current-task changes from unrelated active work and record exact included paths or hunks.
    - Preserve unrelated user changes. Do not stage, commit, reset, stash, or push unless explicitly requested.
 
 3. Validate the current scoped state before requesting a score:
-   - Run the smallest meaningful tests, typecheck, lint, build, or focused scripts for the touched surface.
-   - Fix validation failures only when they correspond to selected severity levels.
-   - If an out-of-scope failure prevents meaningful review, stop and ask whether to expand the selected levels; do not fix it silently.
-   - If an out-of-scope failure does not prevent review, record it as a validation note without expanding the loop or lowering the scoped score.
+   - Run focused validation (tests, typecheck, lint, build, or focused scripts) for the touched surface/module first.
+   - Global blockers (app does not compile, broken type contracts, or failures in touched/dependent flows) must be fixed to green to guarantee working code.
+   - If an isolated, pre-existing failure is discovered in an unrelated legacy module: notify the user with a concise message describing the problem and offer options (e.g. A: apply a minimal targeted fix now, B: isolate validation scope to the touched package). Proceed according to user choice or apply a minimal fix if trivial.
    - Record commands and results for independent verification.
 
 4. Start exactly one independent reviewer, never two or more at once:
@@ -192,6 +198,7 @@ The score summarizes only the chosen levels. It never overrides concrete in-scop
 ## Score Trajectory Report
 
 - Maintain a running scoreboard. After the first round, before each subsequent pass, and once more in the Final Response, print exactly one table in the user's language and plain wording. Do not add an English duplicate.
+- **Mandatory Chat Output After Every Round:** At the conclusion of EVERY completed round, the orchestrator MUST immediately output the updated Scoreboard Table directly into the chat session as a distinct, user-visible message. Never delay, batch, or accumulate multiple rounds before displaying the table to the user.
 - For intermediate updates, the table is the entire update with no prose above or below it.
 - Use these translated columns:
   - **Round:** completed round number.
@@ -214,12 +221,23 @@ Example in Russian; render it in the user's language with the selected scope and
 
 Mirror round scores into a small state file so a live status line can show them. Refresh it whenever the table is printed and clear it when the loop finishes. Failure here must never block or alter review.
 
-- Key the file by repository root, falling back to `$PWD` outside Git:
-  `RF="$HOME/.Codex/statusline-state/loop-review/$(printf '%s' "$(git rev-parse --show-toplevel 2>/dev/null || printf '%s' "$PWD")" | sed 's#[^A-Za-z0-9]#_#g')"`
-- Write one `<sev>:<score>` segment per round, joined by `;`, latest last. Start the line with `code|`.
-- Map severity as: `c` = blocker/critical/serious, `m` = medium, `s` = minor/preference, `n` = no in-scope findings.
-- Example: `mkdir -p "$(dirname "$RF")" && printf 'code|%s\n' "c:8,0;n:9,5" > "$RF"`
-- Remove the file in the Final Response with `rm -f "$RF"` after printing the final table.
+- Key the file by repository root, falling back to current working directory outside Git. Directory path: `$HOME/.config/statusline-state/loop-review/`.
+- Format: one `<sev>:<score>` segment per round, joined by `;`, latest last. Start the line with `code|`.
+- Map severity as: `c` = blocker/critical/serious, `m` = medium, `s` = minor/preference, `n` = no in-scope findings. Example: `code|c:8,0;n:9,5`.
+
+**Bash / Unix:**
+```bash
+RF="$HOME/.config/statusline-state/loop-review/$(printf '%s' "$(git rev-parse --show-toplevel 2>/dev/null || printf '%s' "$PWD")" | sed 's#[^A-Za-z0-9]#_#g')"
+mkdir -p "$(dirname "$RF")" && printf 'code|%s' "c:8,0;n:9,5" > "$RF"
+rm -f "$RF"
+```
+
+**Windows PowerShell:**
+```powershell
+$r = (git rev-parse --show-toplevel 2>$null); if (-not $r) { $r = $PWD.Path }; $RF = "$HOME/.config/statusline-state/loop-review/$($r -replace '[^A-Za-z0-9]', '_')"
+New-Item -ItemType Directory -Force -Path (Split-Path $RF) | Out-Null; Set-Content -Path $RF -Value "code|c:8,0;n:9,5" -NoNewline
+Remove-Item -Path $RF -Force -ErrorAction Ignore
+```
 
 ## Reviewer Prompt Template
 

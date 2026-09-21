@@ -81,7 +81,14 @@ loop-code-review-3
 loop-plan-review-3 path/to/plan.md
 ```
 
-The skill first asks which severity levels to search and waits for an explicit answer.
+You can also specify severity directly for an instant fast-path launch:
+
+```text
+/lcr 1-3
+/lpr path/to/plan.md 1-3
+```
+
+When invoked without parameters, the skill first asks which severity levels to search and waits for an explicit answer.
 
 ## Repository structure
 

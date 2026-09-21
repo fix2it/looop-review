@@ -23,9 +23,13 @@ Run an interactive review-and-improve loop over a plan document. First require t
 
 Execution-ready means that an implementer with repository access but no conversation history can follow the plan without guessing about goals, ordering, ownership, file-level targets, acceptance criteria, risks, validation, or fallback behavior.
 
+## Fast-Path Invocation
+
+If the user explicitly specifies the severity levels (and optionally the plan file) in the triggering command (for example `/lpr 1-3`, `/loop-plan-review-3 plans/my-plan.md 1-3`, or `lpr 1-4`), normalize the selection, resolve the plan document, confirm both in a single concise sentence, and proceed directly to Step 2 (resolve and inspect plan) without asking. If severity is missing or ambiguous, ask the question below.
+
 ## Mandatory Severity Selection
 
-Before reading the plan, inspecting the repository, checking referenced files, or spawning a reviewer, ask which severity levels to search. This question is mandatory on every invocation, even when the invocation appears to imply a choice. Ask in the user's language, make it the only substantive response, end the turn, and wait for an explicit answer.
+Before reading the plan, inspecting the repository, checking referenced files, or spawning a reviewer, ask which severity levels to search (unless already provided via Fast-Path). If the target plan document is also ambiguous or unstated, ask for both the target plan path and severity levels together in this single turn. Ask in the user's language, make it the only substantive response, end the turn, and wait for an explicit answer.
 
 Present all options with short plain-language descriptions:
 
@@ -92,9 +96,10 @@ Treat plan review as a gate to safe implementation, not a demand for a perfect d
 
 ## Plan Scope
 
-- Review the plan path supplied with the invocation. If absent, use the plan most recently created or discussed; if ambiguous, ask which document to review after severity selection.
+- Review the plan path supplied with the invocation or Fast-Path. If absent, use the plan most recently created or discussed; if ambiguous, ask which document to review together with severity selection.
 - Identify grounding sources before the first scoring pass: product specification or TZ, data-model and architecture documents, and code areas the plan references.
 - Pass source paths to reviewers, never parent conclusions.
+- **In-place editing:** Apply plan revisions directly into the target plan document in-place. Do not create duplicate versioned files (e.g. `plan_v2.md`).
 - Edit only the plan and directly coupled plan documents explicitly in scope. Never implement the planned code during this loop.
 - Preserve unrelated user changes. Do not stage, commit, reset, stash, or push unless explicitly requested.
 
@@ -137,7 +142,9 @@ Prohibited without exception:
 - Using a reviewer preset, role, agent type, or configuration whose model or fixed effort differs from the orchestrator's current model and effort.
 - Substituting a stand-in when the orchestrator's model or effort cannot be determined.
 
-If exact model parity or exact effort parity cannot be established, do not launch the reviewer and do not count a pass. Stop and report the loop as incomplete, naming which parity could not be established.
+When running on platforms with native subagent inheritance (such as `model: inherit` in Antigravity/Gemini or standard subagent tool calls where the host platform automatically preserves the orchestrator's model and reasoning settings), runtime parity is satisfied automatically and does not require explicit textual confirmation of internal reasoning-effort parameters.
+
+If exact model parity or exact effort parity cannot be established (and native inheritance is not available), do not launch the reviewer and do not count a pass. Stop and report the loop as incomplete, naming which parity could not be established.
 
 The only permitted deviation is an explicit, unambiguous instruction from the user to run the reviewer on a specific different model. Never infer this from context, environment, or convenience. When it happens, state the deviation in the round table and in the Final Response.
 
@@ -159,7 +166,7 @@ Do not chase score-only polish.
 
 ## Workflow
 
-1. Complete **Mandatory Severity Selection** and wait for the user's answer.
+1. Determine scope and plan target: use **Fast-Path Invocation** if provided in the triggering command; otherwise complete **Mandatory Severity Selection** (along with resolving the plan target if ambiguous) and wait for the user's answer.
 
 2. Resolve and inspect the plan:
    - Determine the plan document unambiguously.
@@ -220,8 +227,8 @@ The score summarizes only chosen levels. It never overrides concrete in-scope fi
 
 ## Score Trajectory Report
 
-- Maintain a running scoreboard. After the first round, before each subsequent pass, and once more in the Final Response, print exactly one table in the user's language and plain wording. Do not add an English duplicate.
-- For intermediate updates, the table is the entire update with no prose above or below it.
+- **Mandatory Chat Output After Every Round**: At the conclusion of EVERY completed round, the orchestrator MUST immediately output a visible message to the user containing the updated Score Trajectory table and a concise bullet-point summary of the findings and revisions. Never launch the next reviewer or continue the loop silently without showing the completed round results to the user in chat.
+- Maintain a running scoreboard. Render the table in the user's language with plain wording. Do not add an English duplicate.
 - Use these translated columns:
   - **Round:** completed round number.
   - **Search scope:** selected plan-defect levels for that round.
@@ -243,12 +250,23 @@ Example in Russian; render it in the user's language with the selected scope and
 
 Mirror scores into a small state file for a live status line. Refresh it whenever the table is printed and clear it when the loop finishes. Failure here must never block or alter review.
 
-- Key the file by repository root, falling back to `$PWD` outside Git:
-  `RF="$HOME/.Codex/statusline-state/loop-review/$(printf '%s' "$(git rev-parse --show-toplevel 2>/dev/null || printf '%s' "$PWD")" | sed 's#[^A-Za-z0-9]#_#g')"`
-- Write one `<sev>:<score>` segment per round, joined by `;`, latest last. Start with `plan|`.
-- Map severity as: `c` = blocker/critical/serious, `m` = medium, `s` = minor/preference, `n` = no in-scope findings.
-- Example: `mkdir -p "$(dirname "$RF")" && printf 'plan|%s\n' "c:8,0;n:9,5" > "$RF"`
-- Remove the file in the Final Response with `rm -f "$RF"` after printing the final table.
+- Key the file by repository root, falling back to current working directory outside Git. Directory path: `$HOME/.config/statusline-state/loop-review/`.
+- Format: one `<sev>:<score>` segment per round, joined by `;`, latest last. Start the line with `plan|`.
+- Map severity as: `c` = blocker/critical/serious, `m` = medium, `s` = minor/preference, `n` = no in-scope findings. Example: `plan|c:8,0;n:9,5`.
+
+**Bash / Unix:**
+```bash
+RF="$HOME/.config/statusline-state/loop-review/$(printf '%s' "$(git rev-parse --show-toplevel 2>/dev/null || printf '%s' "$PWD")" | sed 's#[^A-Za-z0-9]#_#g')"
+mkdir -p "$(dirname "$RF")" && printf 'plan|%s' "c:8,0;n:9,5" > "$RF"
+rm -f "$RF"
+```
+
+**Windows PowerShell:**
+```powershell
+$r = (git rev-parse --show-toplevel 2>$null); if (-not $r) { $r = $PWD.Path }; $RF = "$HOME/.config/statusline-state/loop-review/$($r -replace '[^A-Za-z0-9]', '_')"
+New-Item -ItemType Directory -Force -Path (Split-Path $RF) | Out-Null; Set-Content -Path $RF -Value "plan|c:8,0;n:9,5" -NoNewline
+Remove-Item -Path $RF -Force -ErrorAction Ignore
+```
 
 ## Reviewer Prompt Template
 
